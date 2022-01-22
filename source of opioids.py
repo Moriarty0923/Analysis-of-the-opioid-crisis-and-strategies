@@ -164,11 +164,11 @@ def adjMatrix(medical_name, time, distance_threshold):
     M=nx.DiGraph()
     excel_path = 'kmeans.xls'
     klocation = pd.read_excel(excel_path, sheet_name='ZoneCounty Correspondence Table')
-    print(klocation)
+    #print(klocation)
     kdata = pd.read_excel(excel_path, sheet_name='Date based on Zone')
     distance = pd.read_excel('distance.xls', sheet_name='distance',header=None).values
     simi = pd.read_excel('similarity.xls',sheet_name = 'sim',header=None).values
-
+    #print(len(distance))
     edges = []
     medical_data = kdata[(kdata['substanceName'] == medical_name) & (kdata['YYYY'] == time)]
     combins = [list(c) for c in combinations(set(medical_data['Zone'].values.tolist()), 2)]
@@ -193,7 +193,7 @@ def adjMatrix(medical_name, time, distance_threshold):
                 #print(combins[i].reverse())
                 G.add_edges_from([combins[i]], weight = round(simi[combins[i][0], combins[i][1]],1))
                 weights.append(round(simi[combins[i][0], combins[i][1]],1))
-    print(edges)
+    #print(edges)
     degree = [[x, 0] for x in range(100)]
     for i in range(len(edges)):
         degree[edges[i][0]][1] += 1
@@ -201,7 +201,7 @@ def adjMatrix(medical_name, time, distance_threshold):
     ra = random.randint(0, 3)
     origin = degree[ra][0]
 
-    print(degree)
+    #print(degree)
     # Draw the picture
     # G.add_edges_from(edges)
     ind = []
@@ -229,13 +229,85 @@ def adjMatrix(medical_name, time, distance_threshold):
     fig.set_size_inches(40, 20)
     plt.savefig(str(medical_name) + '_' + str(time) + "_" + "0.png") # save as png
 
+
+def get_new_edges(edges, origin):
+    new_edges = []
+    color_mat = []
+    for i in range(len(edges)):
+        if(edges[i][0] == origin):
+            new_edges.append(edges[i])
+            color_mat.append([edges[i],'salmon'])
+    s_edges = new_edges
+    for i in range(len(new_edges)):
+        tem = new_edges[i][1]
+        for k in range(len(edges)):
+            if (edges[k][0] == tem):
+                s_edges.append(edges[k])
+                color_mat.append([edges[k],'navajowhite'])
+    t_edges = s_edges
+    #print(s_edges)
+    for i in range(len(s_edges)):
+        tem1 = s_edges[i][1]
+        for k in range(len(edges)):
+            if(edges[k][0] == tem1):
+                t_edges.append(edges[k])
+                color_mat.append([edges[k], 'mediumslateblue'])
+        return t_edges, color_mat
+
+
+def get_all_origin(time, distance_threshold):
+    excel_path = 'kmeans.xls'
+    klocation = pd.read_excel(excel_path, sheet_name='ZoneCounty Correspondence Table')
+    kdata = pd.read_excel(excel_path, sheet_name='Date based on Zone')
+    distance = pd.read_excel('distance.xls', sheet_name='distance',header=None).values
+    simi = pd.read_excel('similarity.xls',sheet_name = 'sim',header=None).values
+    medical = []
+    def opoid_extract(x):
+        if not (x in medical):
+            medical.append(x)
+    kdata['substanceName'].apply(opoid_extract)
+    all_origins = []
+    for kk in range(len(medical)):
+        medical_name = medical[kk]
+        edges = []
+        medical_data = kdata[(kdata['substanceName'] == medical_name) & (kdata['YYYY'] == time)]
+        combins = [list(c) for c in combinations(set(medical_data['Zone'].values.tolist()), 2)]
+        weights = []
+        for i in range(len(combins)):
+            x = combins[i][0]
+            y = combins[i][1]
+            if distance[x, y] < distance_threshold:
+                #print(medical_data[medical_data[’Zone’] == x])
+                #print(medical_data[medical_data[’Zone’] == y])
+                if (sum(medical_data[medical_data['Zone'] == x]['DrugReportZone'].values) >=
+                    sum(medical_data[medical_data['Zone'] == y]['DrugReportZone'].values)):
+                    edges.append(combins[i])
+                    #G.add_edges_from([combins[i]], weight = round(simi[combins[i][0],combins[i][1]],1))
+                    #weights.append(round(simi[combins[i][0],combins[i][1]],1))
+                else:
+                    combins[i].reverse()
+                    edges.append(combins[i])
+                #print(combins[i].reverse())
+                #G.add_edges_from([combins[i]], weight = round(simi[combins[i][0], combins[i][1]],1))
+                #weights.append(round(simi[combins[i][0], combins[i][1]],1))
+        degree = [[x,0] for x in range(100)]
+        for i in range(len(edges)):
+            degree[edges[i][0]][1] += 1
+        degree.sort(key=lambda x: x[1],reverse = True)
+        ra = random.randint(0,3)
+        origin = degree[ra][0]
+        all_origins.append([medical[kk], origin])
+        print([medical[kk], origin])
+    print(all_origins)
+
+
 if __name__ == '__main__':
     data = xlrd.open_workbook('kmeans.xls')
     drug2num, num2drug, dataslice, center = init(data)
     #cal_distance(center)
-    trainingMatrix = np.zeros((100,69,7),dtype = np.int)
+    trainingMatrix = np.zeros((100,69,8),dtype = np.int)
     #print(len(num2drug))
-    for year in range(7):
+    for year in range(8):
         tmp = sparseMatrix(dataslice[year], drug2num, num2drug)
         for i in range(100):
             for j in range(len(num2drug)):
@@ -246,5 +318,6 @@ if __name__ == '__main__':
     #print(trainingMatrix)
     make_simi_xls(trainingMatrix,center,300000)
     #print(similarity(2, trainingMatrix, center, 300000))
-    adjMatrix('Heroin', 2014, 200000)
-    # #get_all_origin(2010, 200000)
+    #adjMatrix('Heroin', 2014, 200000)
+    adjMatrix('Propoxyphene', 2014, 200000)
+    get_all_origin(2010, 200000)
